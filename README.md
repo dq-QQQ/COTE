@@ -23,7 +23,6 @@ Claude Code 에서 그냥 말하면 된다 — "코테 하자", "이 문제 왜 
 export CT_HOME=~/COTE
 CT=~/COTE/skill/scripts/ct.py
 
-python3 $CT sync --direction pull        # 시작 전 반드시
 python3 $CT status                       # 약점 순위 보고 뭘 풀지 결정
 python3 $CT new 미로탐색 --tags bfs       # 세션 생성
 python3 $CT watch &                      # 타임라인 기록 (백그라운드)
@@ -32,7 +31,6 @@ python3 $CT judge                        # 예제 채점
 python3 $CT stress                       # 예제는 맞는데 틀릴 때 반례 탐색
 python3 $CT timeline                     # 어디서 막혔는지 회고
 python3 $CT done --result solved --minutes 38 --hints 1
-python3 $CT sync -m "미로탐색"            # 끝나면 반드시
 ```
 
 ## 구조
@@ -45,9 +43,19 @@ sessions/       세션별 지문·풀이·테스트·타임라인
 skill/          Claude Code 스킬 본체 (SKILL.md, scripts, references)
 ```
 
+## 동기화는 자동이다
+
+`ct.py` 를 부를 때마다 알아서 `git pull --rebase --autostash` 하고(5분 쿨다운),
+상태가 바뀌는 명령(`new`/`judge`/`stress`/`done`) 뒤에는 자동으로 commit + push 한다.
+집에서 풀던 걸 회사에서 `status` 한 번 치면 그대로 이어진다.
+
+- 끄려면 `python3 $CT --no-sync <명령>`
+- 오프라인이면 경고만 내고 로컬로 계속 진행한다
+- `--autostash` 를 쓰므로 `solution.py` 를 쓰다 만 상태에서도 pull 이 막히지 않는다
+- 양쪽에서 **동시에** 작업하면 충돌날 수 있다. 그때만 수동 해결이 필요하다
+
 ## 주의
 
-- **시작 전 pull, 끝나고 push.** 양쪽에서 동시에 작업하면 충돌난다
 - `--hints` 와 `--minutes` 는 정직하게. 부풀리면 복습 간격이 실력보다 길어져
   시스템 전체가 망가진다
 
