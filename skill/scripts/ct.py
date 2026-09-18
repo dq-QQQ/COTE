@@ -295,9 +295,52 @@ def cmd_status(a):
 
 # ---------------------------------------------------------------- sync
 
+SYNCED = STATE / ".last_pull"
+MUTATING = {"new", "done", "judge", "stress"}
+
+
 def _git(*args, check=True):
     return subprocess.run(["git", "-C", str(HOME), *args],
                           capture_output=True, text=True, check=check)
+
+
+def autopull(quiet=True):
+    """명령 시작 시 다른 기기 작업분을 당겨온다.
+
+    --autostash 를 쓰는 이유: 사용자가 solution.py 를 쓰다 만 상태에서도
+    pull 이 막히지 않아야 하기 때문이다. 훈련 흐름이 끊기는 게 제일 나쁘다.
+    """
+    if not (HOME / ".git").exists():
+        return
+    # 잦은 명령마다 네트워크를 때리지 않도록 5분 쿨다운을 둔다.
+    try:
+        if time.time() - SYNCED.stat().st_mtime < 300:
+            return
+    except FileNotFoundError:
+        pass
+    r = _git("pull", "--rebase", "--autostash", check=False)
+    SYNCED.parent.mkdir(parents=True, exist_ok=True)
+    SYNCED.touch()
+    if r.returncode:
+        print(f"⚠️  pull 실패 — 오프라인이거나 충돌이다. 로컬로 계속 진행한다.\n{(r.stderr or '')[:300]}",
+              file=sys.stderr)
+    elif not quiet and "Already up to date" not in (r.stdout or ""):
+        print(f"↓ 다른 기기 작업분 수신\n{r.stdout.strip()[:400]}")
+
+
+def autopush(label):
+    """상태가 바뀌었으면 바로 올린다. 나중에 하려면 반드시 까먹는다."""
+    if not (HOME / ".git").exists():
+        return
+    _git("add", "-A")
+    if not _git("status", "--porcelain").stdout.strip():
+        return
+    _git("commit", "-m", f"practice: {label}", check=False)
+    r = _git("push", check=False)
+    if r.returncode:
+        print("⚠️  push 실패 — 다음 명령에서 다시 시도한다.", file=sys.stderr)
+    else:
+        print("↑ 저장됨")
 
 
 def cmd_sync(a):
@@ -364,10 +407,19 @@ def main():
     sy.add_argument("--pull-only", action="store_true")
     sy.add_argument("-m", "--message"); sy.set_defaults(f=cmd_sync)
 
+    p.add_argument("--no-sync", action="store_true", help="자동 pull/push 생략")
     a = p.parse_args()
     STATE.mkdir(parents=True, exist_ok=True)
     SESSIONS.mkdir(parents=True, exist_ok=True)
-    a.f(a)
+
+    auto = not a.no_sync and a.cmd != "sync"
+    if auto:
+        autopull(quiet=(a.cmd not in ("status", "due")))
+    try:
+        a.f(a)
+    finally:
+        if auto and a.cmd in MUTATING:
+            autopush(f"{a.cmd} {datetime.now():%Y-%m-%d %H:%M}")
 
 
 if __name__ == "__main__":
