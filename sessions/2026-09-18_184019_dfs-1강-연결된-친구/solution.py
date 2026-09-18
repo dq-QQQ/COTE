@@ -1,2 +1,0 @@
-def solution(arr):
-    pass
