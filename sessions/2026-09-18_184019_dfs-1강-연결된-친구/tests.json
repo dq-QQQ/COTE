@@ -1,0 +1,16 @@
+{
+  "mode": "func",
+  "func": "solution",
+  "cases": [
+    {
+      "args": [
+        [
+          1,
+          2,
+          3
+        ]
+      ],
+      "expect": 6
+    }
+  ]
+}
